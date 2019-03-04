@@ -4,6 +4,7 @@ local balance = require("balance")
 local config = require("config")
 local production_score = require("production-score")
 local kill_score = require("kill-score")
+local research_sync = require("research-sync")
 local insert = table.insert
 local script_data =
 {
@@ -1208,6 +1209,7 @@ function end_round(admin)
   script_data.kill_scores = nil
   script_data.last_defcon_tick = nil
   script_data.next_defcon_tech = nil
+  research_sync.cleanup()
   script_data.silos = nil
   script.raise_event(events.on_round_end, {})
 end
@@ -2406,6 +2408,9 @@ function final_setup_step()
   if script_data.config.team_config.defcon_mode then
     defcon_research()
   end
+  --if script_data.config.team_config.share_tech then
+    research_sync.init()
+  --end
 
   script.raise_event(events.on_round_start, {})
 end
@@ -3625,6 +3630,8 @@ local on_tick = function(event)
   if script_data.setup_finished == false then
     check_starting_area_chunks_are_generated()
     finish_setup()
+  else
+    research_sync.check_sync()
   end
 end
 
@@ -3649,6 +3656,7 @@ end
 
 local on_research_finished = function(event)
   check_technology_for_disabled_items(event)
+  research_sync.finish_shared_research(event)
 end
 
 local on_player_cursor_stack_changed = function(event)
@@ -3671,6 +3679,7 @@ local on_research_started = function(event)
       event.research.force.current_research = nil
     end
   end
+  research_sync.start_shared_research(event)
 end
 
 local on_player_promoted = function(event)
@@ -3719,10 +3728,13 @@ pvp.add_remote_interface = function()
       return script_data.config
     end,
     set_config = function(array)
-      log("PvP global config set by remote call - Can expect script errors after this point.")
+      log("pvp global config set by remote call - Can expect script errors after this point.")
       for k, v in pairs (array) do
         script_data.config[k] = v
       end
+    end,
+    merge_tech = function()
+      research_sync.merge_tech()
     end
   })
 end
@@ -3755,6 +3767,7 @@ pvp.on_init = function()
   global.pvp = script_data
   balance.script_data = script_data
   config.script_data = script_data
+  research_sync.script_data = script_data
   balance.init()
   local surface = game.create_surface("Lobby",{width = 1, height = 1})
   surface.set_tiles({{name = "out-of-map",position = {1,1}}})
@@ -3768,6 +3781,7 @@ pvp.on_load = function()
   script_data = global.pvp or script_data
   balance.script_data = script_data
   config.script_data = script_data
+  research_sync.script_data = script_data
 end
 
 pvp.on_configuration_changed = function(event)

@@ -70,7 +70,8 @@ config.get_config = function()
   data.team_config =
   {
     friendly_fire = true,
-    unlock_combat_research = false,
+    unlock_combat_research = true,
+    share_tech = true,
     defcon_mode = false,
     max_players = 0,
     defcon_timer = 5,
